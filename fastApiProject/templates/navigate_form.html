@@ -1,0 +1,27 @@
+<!--navigate_form.html-->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Get Directions</title>
+    <script>
+        function getLocationAndSubmit() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    document.getElementById('origin_lat').value = position.coords.latitude;
+                    document.getElementById('origin_lng').value = position.coords.longitude;
+                    document.getElementById('navigate-form').submit();
+                });
+            } else {
+                alert(".");
+            }
+        }
+    </script>
+</head>
+<body onload="getLocationAndSubmit()">
+    <h1>Get Directions</h1>
+    <form id="navigate-form" method="post" action="/navigate">
+        <input type="hidden" id="origin_lat" name="origin_lat">
+        <input type="hidden" id="origin_lng" name="origin_lng">
+    </form>
+</body>
+</html>

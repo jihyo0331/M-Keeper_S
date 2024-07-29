@@ -1,0 +1,134 @@
+<!--user.html-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>user_app</title>
+    <style>
+        #swipeArea {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+        }
+        .arrow {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+        }
+        .arrow.up {
+            top: 25%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(0deg);
+        }
+        .arrow.down {
+            bottom: 25%;
+            left: 50%;
+            transform: translate(-50%, 50%) rotate(0deg);
+        }
+        .arrow.left {
+            top: 50%;
+            left: 25%;
+            transform: translate(-50%, -50%) rotate(0deg);
+        }
+        .arrow.right {
+            top: 50%;
+            right: 25%;
+            transform: translate(50%, -50%) rotate(0deg);
+        }
+    </style>
+</head>
+<body>
+    <div id="swipeArea">
+        <svg class="arrow up" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M12 2L5 8h5v12h4V8h5z"></path>
+        </svg>
+        <svg class="arrow down" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M12 22l7-6h-5V4h-4v12H5z"></path>
+        </svg>
+        <svg class="arrow left" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M2 12l6 7v-5h12v-4H8V5z"></path>
+        </svg>
+        <svg class="arrow right" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M22 12l-6-7v5H4v4h12v5z"></path>
+        </svg>
+    </div>
+
+    <script>
+        // Function to speak a message
+        function speakMessage(message) {
+            const speech = new SpeechSynthesisUtterance(message);
+            window.speechSynthesis.speak(speech);
+        }
+
+        // Initial message
+        speakMessage("길찾기를 하려면 화면을 위로 미세요, 앱을 종료하고 싶으시면 화면을 왼쪽으로 미세요.");
+
+        let touchStartY = 0;
+        let touchEndY = 0;
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        const swipeArea = document.getElementById('swipeArea');
+
+        swipeArea.addEventListener('touchstart', function(event) {
+            touchStartY = event.changedTouches[0].screenY;
+            touchStartX = event.changedTouches[0].screenX;
+        });
+
+        swipeArea.addEventListener('touchend', function(event) {
+            touchEndY = event.changedTouches[0].screenY;
+            touchEndX = event.changedTouches[0].screenX;
+            handleSwipe();
+        });
+
+        function handleSwipe() {
+            if (Math.abs(touchEndX - touchStartX) > Math.abs(touchEndY - touchStartY)) {
+                if (touchEndX < touchStartX) {
+                    console.log('Swiped left');
+                    sendSwipeEvent('left');
+                } else if (touchEndX > touchStartX) {
+                    console.log('Swiped right');
+                    sendSwipeEvent('right');
+                }
+            } else {
+                if (touchEndY < touchStartY) {
+                    console.log('Swiped up');
+                    sendSwipeEvent('up');
+                    speakMessage("목적지까지 길안내를 시작합니다.");
+                } else if (touchEndY > touchStartY) {
+                    console.log('Swiped down');
+                    sendSwipeEvent('down');
+                }
+            }
+        }
+
+        function sendSwipeEvent(direction) {
+            let swipeData;
+            if (direction === 'up') {
+                swipeData = { swipe: 'up' };
+            } else if (direction === 'down') {
+                swipeData = { swipe: 'down' };
+            } else if (direction === 'left') {
+                swipeData = { swipe: 'left' };
+            } else if (direction === 'right') {
+                swipeData = { swipe: 'right' };
+            }
+
+            fetch('/swipe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(swipeData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html>

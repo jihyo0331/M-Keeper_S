@@ -1,0 +1,132 @@
+<!--navigate.html-->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Navigation Directions</title>
+    <script type="text/javascript" src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=YOUR_NAVER_CLIENT_ID"></script>
+    <script type="text/javascript">
+        let bluetoothDevice;
+        let bluetoothCharacteristic;
+
+        async function selectBluetoothDevice() {
+            try {
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+                });
+
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                bluetoothCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+
+                console.log('Connected to Bluetooth device');
+            } catch (error) {
+                console.error('Failed to connect to Bluetooth device', error);
+            }
+        }
+
+        async function sendCommand(command) {
+            if (!bluetoothCharacteristic) {
+                console.error('Bluetooth device is not connected');
+                return;
+            }
+
+            const encoder = new TextEncoder();
+            await bluetoothCharacteristic.writeValue(encoder.encode(command));
+        }
+
+        function showDirectionsOnMap(path) {
+            var map = new naver.maps.Map("map", {
+                center: new naver.maps.LatLng(37.5665, 126.9780),
+                zoom: 12
+            });
+
+            var pathCoordinates = path.map(step => new naver.maps.LatLng(step[1], step[0]));
+            var polyline = new naver.maps.Polyline({
+                map: map,
+                path: pathCoordinates,
+                strokeColor: '#5347AA',
+                strokeOpacity: 0.6,
+                strokeWeight: 6
+            });
+
+            map.setCenter(pathCoordinates[0]);
+        }
+
+        async function sendDirectionsToArduino(guides) {
+            for (let i = 0; i < guides.length; i++) {
+                const guide = guides[i];
+                const instructions = guide.instructions;
+
+                if (instructions.includes('좌회전')) {
+                    await sendCommand('L');
+                } else if (instructions.includes('우회전')) {
+                    await sendCommand('R');
+                } else {
+                    await sendCommand('F');
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            await sendCommand('S');
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const directions = JSON.parse(urlParams.get('directions'));
+            if (directions) {
+                showDirectionsOnMap(directions.path);
+                sendDirectionsToArduino(directions.guides);
+            }
+            document.getElementById('connect-bluetooth').addEventListener('click', selectBluetoothDevice);
+        });
+
+        async function captureImage() {
+            const video = document.createElement('video');
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                await new Promise((resolve) => video.onloadedmetadata = resolve);
+                video.play();
+
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = canvas.toDataURL('image/jpeg');
+
+                const response = await fetch('/upload_image', {
+                    method: 'POST',
+                    body: dataURItoBlob(imageData)
+                });
+
+                const detectionResult = await response.json();
+                console.log('Detection Result:', detectionResult);
+
+                // Process detectionResult as needed
+
+            } catch (error) {
+                console.error('Error capturing image', error);
+            }
+        }
+
+        function dataURItoBlob(dataURI) {
+            const byteString = atob(dataURI.split(',')[1]);
+            const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            return new Blob([ab], { type: mimeString });
+        }
+    </script>
+</head>
+<body>
+    <h1>Navigation Directions</h1>
+    <button id="connect-bluetooth">Connect to Bluetooth</button>
+    <button onclick="captureImage()">Capture Image</button>
+    <div id="map" style="height: 500px; width: 100%;"></div>
+    <a href="/">Go Back</a>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!--index.html-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>M-keeper App</title>
+</head>
+<body>
+    <h1>M-keeper App</h1>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <button id="connect">Connect Bluetooth</button>
+
+    <script>
+        let bluetoothDevice;
+        let bluetoothWriter;
+        let sentCrosswalkSignal = false;
+
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const connectButton = document.getElementById('connect');
+
+        // Access the device camera and stream to video element
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } } })
+            .then((stream) => {
+                video.srcObject = stream;
+                video.addEventListener('loadeddata', () => {
+                    detectFrame();
+                });
+            })
+            .catch((err) => {
+                console.error('Error accessing media devices.', err);
+            });
+
+        connectButton.addEventListener('click', async () => {
+            try {
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+                });
+
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                const characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+
+                bluetoothWriter = characteristic;
+
+                console.log('Bluetooth connected');
+            } catch (error) {
+                console.error('Error connecting to Bluetooth device', error);
+            }
+        });
+
+        async function sendBluetoothMessage(message) {
+            if (!bluetoothWriter) {
+                console.log('Bluetooth device not connected');
+                return;
+            }
+
+            const encoder = new TextEncoder();
+            const data = encoder.encode(message);
+
+            try {
+                await bluetoothWriter.writeValue(data);
+                console.log('Message sent:', message);
+            } catch (error) {
+                console.error('Error sending Bluetooth message', error);
+            }
+        }
+
+        function detectFrame() {
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvas.toDataURL('image/jpeg');
+
+            fetch('/detect_objects', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ image: imageData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+
+                sentCrosswalkSignal = false;
+                drawBoundingBoxes(data);
+                requestAnimationFrame(detectFrame);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                requestAnimationFrame(detectFrame);
+            });
+        }
+
+        function drawBoundingBoxes(detections) {
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            detections.forEach(detection => {
+                if (detection.label === 'crosswalk') {
+                    context.strokeStyle = 'red';
+                    context.lineWidth = 2;
+                    context.strokeRect(detection.box[0], detection.box[1], detection.box[2] - detection.box[0], detection.box[3] - detection.box[1]);
+                    context.font = '18px Arial';
+                    context.fillStyle = 'red';
+                    context.fillText(`${detection.label} (${(detection.score * 100).toFixed(1)}%)`, detection.box[0], detection.box[1] > 20 ? detection.box[1] - 10 : detection.box[1] + 20);
+                    sendBluetoothMessage('S');
+                    sentCrosswalkSignal = true;
+                }
+            });
+        }
+
+        function checkStatus() {
+            fetch('/status')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Status:', data);
+                if (data.swipe_detected) {
+                    sendBluetoothMessage('G');
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        }
+
+        setInterval(checkStatus, 2000);
+    </script>
+</body>
+</html>
