@@ -2,7 +2,6 @@
 from fastapi import FastAPI, Request, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse
-import cv2
 import numpy as np
 import base64
 import io
@@ -121,6 +120,7 @@ async def navigate(request: Request, origin_lat: float = Form(...), origin_lng: 
         'start': f"{origin_lng},{origin_lat}",
         'goal': f"{destination_lng},{destination_lat}",
         'option': 'trafast'
+
     }
     headers = {
         'X-NCP-APIGW-API-KEY-ID': client_id,
