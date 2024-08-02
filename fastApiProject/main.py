@@ -18,8 +18,8 @@ templates = Jinja2Templates(directory="templates")
 model = YOLO('last.pt')
 
 # 네이버 지도 API 설정
-client_id = 'cnnetqv840'
-client_secret = '8U3EJhcESOTerDPSfwaaWw66V8UZqR7igGXkYSlJ'
+client_id = ''
+client_secret = ''
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
