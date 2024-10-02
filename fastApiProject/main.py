@@ -35,6 +35,7 @@ async def root(request: Request):
 async def navigate_form(request: Request):
     return templates.TemplateResponse("navigate.html", {"request": request})
 
+
 @app.get("/user")
 async def user(request: Request):
     return templates.TemplateResponse("user.html", {"request": request})
